@@ -5,55 +5,110 @@
  */
 angular
   .module('ng-context-menu', [])
-  .directive('contextMenu', ['$window', '$parse', function($window, $parse) {
+  /**
+   * Context menu service allows control of other context menus when another
+   * one is triggered, i.e. closing any other currently open context menu 
+   * when another one is opened if multiple context menus exist.
+   */
+  .service('contextMenu', function() {
+    var menus = [];
+    // Expose for outside service calls
+    this.openMenu = openMenu;
+    this.closeMenu = closeMenu; 
+    // References for private service calls (allow openMenu to call closeMenu)
+    var svc = {
+      openMenu: openMenu,
+      closeMenu: closeMenu
+    };
+
+    // {{{ contextMenu.openMenu()
+
+    function openMenu(event, menuElement) {
+      // Item that needs to be opened
+      var curMenuItem;
+      // Close all other opened menus, mark the current one
+      menus.forEach(function(menuItem) {
+        if(menuItem.element === menuElement) {
+          curMenuItem = menuItem;
+        } else if(menuItem.isOpen) {
+          // Close other menu
+          svc.closeMenu(menuItem.element);
+          menuItem.isOpen = false;
+        }
+      });
+
+      // Menu item not yet found, doesn't exist yet
+      if(!curMenuItem) {
+        // Create new current menu item, push onto list of menu items
+        curMenuItem = {
+          isOpen: false,
+          element: menuElement
+        }
+        menus.push(curMenuItem);
+        menuElement.css('position', 'absolute');
+      }
+
+      // Show element
+      menuElement.addClass('open');
+      menuElement.css('top', event.offsetY + 'px');
+      menuElement.css('left', event.offsetX + 'px');
+      curMenuItem.isOpen = true;
+    }
+
+    //  }}}
+    //  {{{ contextMenu.closeMenu()
+
+    function closeMenu(menuElement) {
+      menuElement.removeClass('open');
+      // Set menuItem.isOpen to false
+      menus.forEach(function(menuItem) {
+        if(menuItem.element === menuElement) {
+          menuItem.isOpen = false;
+        }
+      });
+    }
+
+    //  }}}
+  })
+  .directive('contextMenu', ['$window', '$parse', 'contextMenu', function($window, $parse, contextMenu) {
     return {
       restrict: 'A',
       link: function($scope, element, attrs) {
-        var opened = false,
-            openTarget,
+        
+        var menuElement = null,
+            openTarget, 
             disabled = $scope.$eval(attrs.contextMenuDisabled),
             win = angular.element($window),
-            menuElement = angular.element(document.getElementById(attrs.target)),
             fn = $parse(attrs.contextMenu);
-
-        function open(event, element) {
-          element.addClass('open');
-          element.css('top', event.pageY + 'px');
-          element.css('left', event.pageX + 'px');
-          opened = true;
-        }
-
-        function close(element) {
-          opened = false;
-          element.removeClass('open');
-        }
-
-        menuElement.css('position', 'absolute');
 
         element.bind('contextmenu', function(event) {
           if (!disabled) {
+            if(menuElement == null){
+              menuElement = angular.element(document.getElementById(attrs.target));
+              menuElement.css('position', 'absolute');
+            }
             openTarget = event.target;
             event.preventDefault();
             event.stopPropagation();
             $scope.$apply(function() {
               fn($scope, { $event: event });
-              open(event, menuElement);
+              contextMenu.openMenu(event, menuElement);
             });
           }
         });
 
         win.bind('keyup', function(event) {
-          if (!disabled && opened && event.keyCode === 27) {
+          if (menuElement && !disabled && event.keyCode === 27) {
             $scope.$apply(function() {
-              close(menuElement);
+              contextMenu.closeMenu(menuElement);
             });
           }
         });
 
         function handleWindowClickEvent(event) {
-          if (!disabled && opened && (event.button !== 2 || event.target !== openTarget)) {
+          if (menuElement && !disabled && (event.button !== 2 || event.target !== openTarget)) {
             $scope.$apply(function() {
-              close(menuElement);
+              contextMenu.closeMenu(menuElement);
             });
           }
         }
