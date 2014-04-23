@@ -48,7 +48,8 @@ angular
      */
     openMenu = function(event, menuElement) {
       // Item that needs to be opened
-      var curMenu;
+      var curMenu, 
+          targetOffset;
 
       // Close all other opened menus, mark the current one
       menus.forEach(function(menuItem) {
@@ -73,11 +74,11 @@ angular
       }
 
       if(!curMenu.isOpen) {
+        targetOffset = angular.element(event.target).offset();
 
         // Show element
-        // TODO: Fix for child element padding
-        menuElement.css('top', event.offsetY + 'px');
-        menuElement.css('left', event.offsetX + 'px');
+        menuElement.css('top', (event.offsetY || event.clientY - targetOffset.top) + 'px');
+        menuElement.css('left', (event.offsetX || event.clientX - targetOffset.left) + 'px');
         menuElement.addClass('open');
         curMenu.isOpen = true;
       }
