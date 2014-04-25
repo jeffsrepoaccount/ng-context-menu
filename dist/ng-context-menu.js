@@ -59,7 +59,6 @@ angular
 
           // Close other menu
           closeMenu(menuItem.element);
-          menuItem.isOpen = false;
         }
       });
 
